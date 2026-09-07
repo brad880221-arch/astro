@@ -1,6 +1,6 @@
 /**
- * 주간 보고서 렌더러, 아카이브 관리 및 주간 받아보기(구독) 모듈
- * Weekly Report Viewer, Archive Manager & Virtual Dispatch System
+ * 주간 보고서 렌더러, 아카이브 관리 및 주간 받아보기(구독) 모듈 (고도화 버전)
+ * Weekly Report Viewer with Sticky TOC Navigation & Sector Visuals
  */
 
 const SemiReports = {
@@ -11,6 +11,7 @@ const SemiReports = {
     this.renderArchiveList();
     this.bindSubscriptionEvents();
     this.bindToolbarEvents();
+    this.bindTocEvents();
     this.loadSubscriptionSettings();
   },
 
@@ -42,7 +43,6 @@ const SemiReports = {
     const execList = document.getElementById('reportExecSummaryList');
     if (execList && report.executiveSummary) {
       execList.innerHTML = report.executiveSummary.map(item => {
-        // **볼드** 문법 파싱
         const formatted = item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         return `<li>${formatted}</li>`;
       }).join('');
@@ -65,17 +65,28 @@ const SemiReports = {
       `).join('');
     }
 
-    // 3) 한국 4대 B2B 섹터별 영향도
+    // 3) 한국 4대 B2B 섹터별 영향도 (아이콘 추가)
     const sectorGrid = document.getElementById('reportSectorGrid');
     const sectorSection = document.getElementById('reportSectorSection');
     if (sectorGrid && sectorSection) {
       if (report.sectorAnalysis && report.sectorAnalysis.length > 0) {
         sectorSection.style.display = 'block';
+
+        const getSectorIcon = (sec) => {
+          if (sec.includes('금융')) return '🏦';
+          if (sec.includes('공공')) return '🏛️';
+          if (sec.includes('대기업')) return '🏢';
+          return '🏭';
+        };
+
         sectorGrid.innerHTML = report.sectorAnalysis.map(s => `
           <div class="sector-card-box" style="border-left-color: ${s.statusColor}">
             <div class="sector-card-head">
-              <span class="sector-card-title">${s.sector}</span>
-              <span class="sector-badge" style="color:${s.statusColor}; background:rgba(255,255,255,0.06);">${s.status}</span>
+              <span class="sector-card-title">
+                <span>${getSectorIcon(s.sector)}</span>
+                <span>${s.sector}</span>
+              </span>
+              <span class="sector-badge" style="color:${s.statusColor}; background:rgba(255,255,255,0.08);">${s.status}</span>
             </div>
             <div class="sector-card-trend">${s.trend}</div>
             <div class="sector-card-desc">${s.details}</div>
@@ -100,7 +111,7 @@ const SemiReports = {
           return `
             <tr>
               <td><span class="scenario-pill ${pillClass}">${sc.type}</span></td>
-              <td style="font-weight:700; color:#fff;">${sc.probability}</td>
+              <td style="font-weight:800; color:#fff; font-family:var(--font-mono);">${sc.probability}</td>
               <td>${sc.condition}</td>
               <td>${sc.impact}</td>
             </tr>
@@ -133,7 +144,28 @@ const SemiReports = {
     }
   },
 
-  // 2. 아카이브 리스트 렌더링
+  // 2. 목차(TOC) 스크롤 이벤트 바인딩
+  bindTocEvents() {
+    const tocButtons = document.querySelectorAll('.report-toc-btn');
+    tocButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          const headerOffset = 130;
+          const elementPosition = targetEl.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+          });
+        }
+      });
+    });
+  },
+
+  // 3. 아카이브 리스트 렌더링
   renderArchiveList(searchKeyword = '') {
     const archiveContainer = document.getElementById('archiveListContainer');
     if (!archiveContainer) return;
@@ -160,14 +192,14 @@ const SemiReports = {
         <div class="archive-info">
           <div class="archive-meta">
             <span class="issue-pill" style="font-size:0.7rem; padding:2px 8px;">Issue #${r.issueNo}</span>
-            <span style="color:#64748B;">${r.date}</span>
-            <span style="color:var(--accent-cyan); font-weight:600;">${r.category}</span>
+            <span style="color:#64748B; font-family:var(--font-mono);">${r.date}</span>
+            <span style="color:var(--accent-cyan); font-weight:700;">${r.category}</span>
           </div>
           <div class="archive-title">${r.title}</div>
           <div class="archive-summary">${r.summary}</div>
         </div>
         <div>
-          <button class="btn btn-outline" style="font-size:0.8rem; white-space:nowrap;">
+          <button class="btn btn-outline" style="font-size:0.82rem; white-space:nowrap;">
             보고서 열람 →
           </button>
         </div>
@@ -180,7 +212,6 @@ const SemiReports = {
       el.addEventListener('click', () => {
         const id = el.getAttribute('data-id');
         this.renderCurrentReport(id);
-        // 탭 전환
         if (window.App && window.App.switchTab) {
           window.App.switchTab('report-view');
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -189,9 +220,8 @@ const SemiReports = {
     });
   },
 
-  // 3. 리포트 상단 툴바 이벤트 (인쇄, 마크다운 복사, 공유)
+  // 4. 리포트 상단 툴바 이벤트 (인쇄, 마크다운 복사)
   bindToolbarEvents() {
-    // 인쇄 / PDF 저장
     const printBtn = document.getElementById('btnPrintReport');
     if (printBtn) {
       printBtn.addEventListener('click', () => {
@@ -199,7 +229,6 @@ const SemiReports = {
       });
     }
 
-    // 마크다운 복사
     const copyMdBtn = document.getElementById('btnCopyMarkdown');
     if (copyMdBtn) {
       copyMdBtn.addEventListener('click', () => {
@@ -233,7 +262,6 @@ const SemiReports = {
       });
     }
 
-    // 아카이브 검색 인풋
     const searchInput = document.getElementById('archiveSearchInput');
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
@@ -242,7 +270,7 @@ const SemiReports = {
     }
   },
 
-  // 4. 주간 구독 신청 및 가상 발송 모달
+  // 5. 주간 구독 신청 및 가상 발송 모달
   bindSubscriptionEvents() {
     const form = document.getElementById('subscriptionForm');
     const btnDispatchNow = document.getElementById('btnDispatchNow');
@@ -250,7 +278,6 @@ const SemiReports = {
     const modalCloseBtn = document.getElementById('modalCloseBtn');
     const modalConfirmBtn = document.getElementById('modalConfirmBtn');
 
-    // 구독 정보 저장
     if (form) {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -267,13 +294,11 @@ const SemiReports = {
       });
     }
 
-    // 금주 리포트 지금 받아보기 (가상 발송 시뮬레이션)
     if (btnDispatchNow) {
       btnDispatchNow.addEventListener('click', () => {
         const emailInput = document.getElementById('subEmailInput');
         const email = (emailInput && emailInput.value.trim()) || 'executive@company.co.kr';
 
-        // 발송 로딩 효과 시뮬레이션
         btnDispatchNow.disabled = true;
         btnDispatchNow.innerHTML = '📬 이메일 생성 및 발송 중...';
 
@@ -282,21 +307,12 @@ const SemiReports = {
           btnDispatchNow.innerHTML = '⚡ 금주 최신호 지금 즉시 받아보기 (테스트 발송)';
           this.openVirtualEmailModal(email);
           this.showToast(`📩 ${email} 주소로 최신 보고서가 가상 발송되었습니다.`);
-        }, 600);
+        }, 500);
       });
     }
 
-    // 모달 닫기 이벤트
-    if (modalCloseBtn) {
-      modalCloseBtn.addEventListener('click', () => {
-        this.closeModal();
-      });
-    }
-    if (modalConfirmBtn) {
-      modalConfirmBtn.addEventListener('click', () => {
-        this.closeModal();
-      });
-    }
+    if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => this.closeModal());
+    if (modalConfirmBtn) modalConfirmBtn.addEventListener('click', () => this.closeModal());
     if (modal) {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) this.closeModal();
@@ -379,7 +395,6 @@ const SemiReports = {
     }
   },
 
-  // 토스트 알림 메시지
   showToast(message) {
     let container = document.getElementById('toastContainer');
     if (!container) {

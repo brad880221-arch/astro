@@ -1,6 +1,6 @@
 /**
- * 순수 HTML5 Canvas 기반 인터랙티브 차트 모듈
- * Dependency-Free Custom Chart Engine for Semiconductor & B2B PC Intelligence
+ * 순수 HTML5 Canvas 기반 인터랙티브 차트 모듈 (고도화 버전)
+ * Interactive Charts with Mouse Hover Tooltips & Retina Support
  */
 
 const SemiCharts = {
@@ -10,7 +10,6 @@ const SemiCharts = {
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     
-    // 부모 컨테이너 크기 확인
     const width = rect.width || canvas.clientWidth || 300;
     const height = rect.height || canvas.clientHeight || 150;
 
@@ -19,7 +18,7 @@ const SemiCharts = {
 
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
-    return { ctx, width, height };
+    return { ctx, width, height, dpr, rect };
   },
 
   // 1. 미니 스파크라인 차트 (지표 카드 내부)
@@ -46,10 +45,10 @@ const SemiCharts = {
     // 그라디언트 영역 채우기
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
     if (isUp) {
-      gradient.addColorStop(0, 'rgba(16, 185, 129, 0.28)');
+      gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
       gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
     } else {
-      gradient.addColorStop(0, 'rgba(244, 63, 94, 0.28)');
+      gradient.addColorStop(0, 'rgba(244, 63, 94, 0.35)');
       gradient.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
     }
 
@@ -71,7 +70,7 @@ const SemiCharts = {
       ctx.lineTo(points[i].x, points[i].y);
     }
     ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.4;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
@@ -79,13 +78,16 @@ const SemiCharts = {
     // 마지막 지점 포인트
     const lastPoint = points[points.length - 1];
     ctx.beginPath();
-    ctx.arc(lastPoint.x, lastPoint.y, 3, 0, Math.PI * 2);
+    ctx.arc(lastPoint.x, lastPoint.y, 3.5, 0, Math.PI * 2);
     ctx.fillStyle = strokeColor;
     ctx.fill();
+    ctx.strokeStyle = '#070B14';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
   },
 
-  // 2. 반도체 가격 지수 vs 한국 B2B PC ASP 이중 추이 차트
-  renderTrendChart(canvasId) {
+  // 2. 반도체 가격 지수 vs 한국 B2B PC ASP 이중 추이 차트 (호버 툴팁 포함)
+  renderTrendChart(canvasId, activeIndex = -1) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const res = this.initCanvas(canvas);
@@ -96,10 +98,10 @@ const SemiCharts = {
     const semi = SEMI_B2B_DATA.chartData.semiIndex;
     const asp = SEMI_B2B_DATA.chartData.b2bPcASP;
 
-    const padLeft = 45;
-    const padRight = 55;
-    const padTop = 25;
-    const padBottom = 35;
+    const padLeft = 48;
+    const padRight = 58;
+    const padTop = 28;
+    const padBottom = 38;
 
     const chartW = width - padLeft - padRight;
     const chartH = height - padTop - padBottom;
@@ -108,7 +110,7 @@ const SemiCharts = {
 
     // 배경 그리드 라인
     const gridRows = 4;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
     ctx.fillStyle = '#64748B';
     ctx.font = '11px sans-serif';
@@ -138,20 +140,37 @@ const SemiCharts = {
     // X축 레이블
     const stepX = chartW / (labels.length - 1);
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#94A3B8';
     labels.forEach((label, idx) => {
       const x = padLeft + stepX * idx;
+      ctx.fillStyle = (idx === activeIndex) ? '#06B6D4' : '#94A3B8';
+      ctx.font = (idx === activeIndex) ? 'bold 12px sans-serif' : '11px sans-serif';
       ctx.fillText(label, x, height - 12);
     });
 
-    // 1) 반도체 지수 곡선 (Cyan)
     const semiMin = 100;
     const semiMax = 160;
     const getSemiY = (val) => padTop + (1 - (val - semiMin) / (semiMax - semiMin)) * chartH;
 
-    // 그라디언트 영역
+    const aspMin = 115;
+    const aspMax = 140;
+    const getAspY = (val) => padTop + (1 - (val - aspMin) / (aspMax - aspMin)) * chartH;
+
+    // 호버 시 수직 인덱스 크로스헤어
+    if (activeIndex >= 0 && activeIndex < labels.length) {
+      const activeX = padLeft + stepX * activeIndex;
+      ctx.beginPath();
+      ctx.moveTo(activeX, padTop);
+      ctx.lineTo(activeX, padTop + chartH);
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // 1) 반도체 지수 곡선 (Cyan)
     const semiGrad = ctx.createLinearGradient(0, padTop, 0, padTop + chartH);
-    semiGrad.addColorStop(0, 'rgba(6, 182, 212, 0.25)');
+    semiGrad.addColorStop(0, 'rgba(6, 182, 212, 0.32)');
     semiGrad.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
 
     ctx.beginPath();
@@ -172,50 +191,86 @@ const SemiCharts = {
       ctx.lineTo(padLeft + stepX * idx, getSemiY(val));
     });
     ctx.strokeStyle = '#06B6D4';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.8;
     ctx.stroke();
 
-    // 포인트 그리기
+    // 반도체 포인트 그리기
     semi.forEach((val, idx) => {
       const x = padLeft + stepX * idx;
       const y = getSemiY(val);
+      const isHover = (idx === activeIndex);
+
       ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.arc(x, y, isHover ? 7 : 4.5, 0, Math.PI * 2);
       ctx.fillStyle = '#06B6D4';
       ctx.fill();
-      ctx.strokeStyle = '#0F172A';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#070B14';
+      ctx.lineWidth = 2.5;
       ctx.stroke();
     });
 
     // 2) B2B PC ASP 곡선 (Indigo)
-    const aspMin = 115;
-    const aspMax = 140;
-    const getAspY = (val) => padTop + (1 - (val - aspMin) / (aspMax - aspMin)) * chartH;
-
     ctx.beginPath();
     ctx.moveTo(padLeft, getAspY(asp[0]));
     asp.forEach((val, idx) => {
       ctx.lineTo(padLeft + stepX * idx, getAspY(val));
     });
     ctx.strokeStyle = '#818CF8';
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 2.8;
+    ctx.setLineDash([5, 4]);
     ctx.stroke();
-    ctx.setLineDash([]); // 복원
+    ctx.setLineDash([]);
 
     // ASP 포인트 그리기
     asp.forEach((val, idx) => {
       const x = padLeft + stepX * idx;
       const y = getAspY(val);
+      const isHover = (idx === activeIndex);
+
       ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.arc(x, y, isHover ? 7 : 4.5, 0, Math.PI * 2);
       ctx.fillStyle = '#818CF8';
       ctx.fill();
-      ctx.strokeStyle = '#0F172A';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#070B14';
+      ctx.lineWidth = 2.5;
       ctx.stroke();
     });
+
+    // 마우스 이벤트 바인딩 (최초 1회)
+    if (!canvas._hasHoverListener) {
+      canvas._hasHoverListener = true;
+      const tooltip = document.getElementById('trendChartTooltip');
+
+      canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const boundedX = Math.max(padLeft, Math.min(padLeft + chartW, mouseX));
+        const closestIdx = Math.round((boundedX - padLeft) / stepX);
+
+        if (closestIdx >= 0 && closestIdx < labels.length) {
+          SemiCharts.renderTrendChart(canvasId, closestIdx);
+          if (tooltip) {
+            const quarter = labels[closestIdx];
+            const sVal = semi[closestIdx];
+            const aVal = asp[closestIdx];
+
+            tooltip.style.display = 'block';
+            tooltip.style.left = (padLeft + stepX * closestIdx) + 'px';
+            tooltip.style.top = (getSemiY(sVal) - 10) + 'px';
+            tooltip.innerHTML = `
+              <div style="font-weight:800; color:#38BDF8; margin-bottom:4px;">${quarter} 현황</div>
+              <div>• 반도체 지수: <strong>${sVal} pt</strong></div>
+              <div>• B2B PC ASP: <strong>${aVal}만 원</strong></div>
+            `;
+          }
+        }
+      });
+
+      canvas.addEventListener('mouseleave', () => {
+        SemiCharts.renderTrendChart(canvasId, -1);
+        if (tooltip) tooltip.style.display = 'none';
+      });
+    }
   },
 
   // 3. 국내 4대 B2B 섹터 점유율 도넛 차트
@@ -229,8 +284,8 @@ const SemiCharts = {
     const sectors = SEMI_B2B_DATA.koreaB2BMetrics.sectors;
     const centerX = width / 2;
     const centerY = height / 2;
-    const radius = Math.min(centerX, centerY) - 16;
-    const innerRadius = radius * 0.62;
+    const radius = Math.min(centerX, centerY) - 14;
+    const innerRadius = radius * 0.64;
 
     ctx.clearRect(0, 0, width, height);
 
@@ -240,7 +295,6 @@ const SemiCharts = {
       const sliceAngle = (sector.share / 100) * (Math.PI * 2);
       const endAngle = startAngle + sliceAngle;
 
-      // 도넛 섹터 그리기
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, startAngle, endAngle);
       ctx.arc(centerX, centerY, innerRadius, endAngle, startAngle, true);
@@ -248,8 +302,7 @@ const SemiCharts = {
       ctx.fillStyle = sector.color;
       ctx.fill();
 
-      // 경계선
-      ctx.strokeStyle = '#0F172A';
+      ctx.strokeStyle = '#0E1626';
       ctx.lineWidth = 3;
       ctx.stroke();
 
@@ -258,14 +311,14 @@ const SemiCharts = {
 
     // 중앙 텍스트
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 16px sans-serif';
+    ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('78.6만대', centerX, centerY - 8);
 
     ctx.fillStyle = '#94A3B8';
     ctx.font = '11px sans-serif';
-    ctx.fillText('Q3 총 출하 전망', centerX, centerY + 12);
+    ctx.fillText('Q3 총 출하 전망', centerX, centerY + 13);
   },
 
   // 4. AI PC 침투율 분기별 바 차트
@@ -277,23 +330,22 @@ const SemiCharts = {
     const { ctx, width, height } = res;
 
     const data = SEMI_B2B_DATA.chartData.aiPcPenetration;
-    const padLeft = 35;
-    const padRight = 20;
-    const padTop = 25;
-    const padBottom = 35;
+    const padLeft = 38;
+    const padRight = 22;
+    const padTop = 28;
+    const padBottom = 38;
 
     const chartW = width - padLeft - padRight;
     const chartH = height - padTop - padBottom;
 
     ctx.clearRect(0, 0, width, height);
 
-    // 배경 그리드
     const maxVal = 60;
     const gridRows = 3;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
     ctx.fillStyle = '#64748B';
-    ctx.font = '10px sans-serif';
+    ctx.font = '11px sans-serif';
     ctx.textAlign = 'right';
 
     for (let i = 0; i <= gridRows; i++) {
@@ -304,10 +356,10 @@ const SemiCharts = {
       ctx.stroke();
 
       const rateVal = Math.round(maxVal - (maxVal / gridRows) * i);
-      ctx.fillText(rateVal + '%', padLeft - 6, y + 3);
+      ctx.fillText(rateVal + '%', padLeft - 6, y + 4);
     }
 
-    const barWidth = Math.min(32, (chartW / data.length) * 0.65);
+    const barWidth = Math.min(34, (chartW / data.length) * 0.65);
     const stepX = chartW / data.length;
 
     data.forEach((item, idx) => {
@@ -315,7 +367,6 @@ const SemiCharts = {
       const x = padLeft + stepX * idx + (stepX - barWidth) / 2;
       const y = padTop + chartH - barHeight;
 
-      // 바 그라디언트
       const grad = ctx.createLinearGradient(0, y, 0, y + barHeight);
       if (item.quarter.includes('(E)')) {
         grad.addColorStop(0, '#06B6D4');
@@ -327,20 +378,19 @@ const SemiCharts = {
 
       ctx.fillStyle = grad;
       ctx.beginPath();
-      // 상단 둥근 바
-      ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0]);
+      ctx.roundRect(x, y, barWidth, barHeight, [5, 5, 0, 0]);
       ctx.fill();
 
       // 수치 텍스트
       ctx.fillStyle = '#F8FAFC';
-      ctx.font = 'bold 10px sans-serif';
+      ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(item.rate + '%', x + barWidth / 2, y - 6);
 
       // X축 레이블
       ctx.fillStyle = item.quarter.includes('(E)') ? '#38BDF8' : '#94A3B8';
-      ctx.font = '10px sans-serif';
-      ctx.fillText(item.quarter, x + barWidth / 2, height - 10);
+      ctx.font = '11px sans-serif';
+      ctx.fillText(item.quarter, x + barWidth / 2, height - 12);
     });
   },
 
